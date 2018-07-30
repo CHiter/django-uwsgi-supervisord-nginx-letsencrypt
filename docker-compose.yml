@@ -1,0 +1,46 @@
+version: "2"
+
+services:
+
+    web:
+        image: webapp_image
+        volumes:
+            - static_files:/webapp/static
+        environment:
+            - DEBUG=${DEBUG}
+
+        command: /bin/sh 'run_web.sh'
+
+    nginx:
+        image: nginx
+        links:
+            - web
+        volumes:
+            - static_files:/webapp/static
+            - ./configs/nginx/:/etc/nginx/conf.d/
+        environment:
+            - HTTPS_METHOD=redirect
+            - VIRTUAL_HOST=example.com,www.example.com
+            - LETSENCRYPT_HOST=example.com,www.example.com
+            - LETSENCRYPT_EMAIL=admin@example.com
+
+    nginx-proxy:
+        image: jwilder/nginx-proxy
+        ports:
+            - 80:80
+            - 443:443
+        volumes:
+            - ./configs/nginx/custom_proxy_settings.conf:/etc/nginx/conf.d/custom_proxy_settings.conf
+            - ./nginx/vhost.d:/etc/nginx/vhost.d
+            - ./nginx/html:/usr/share/nginx/html
+            - ./nginx/certs:/etc/nginx/certs
+            - /var/run/docker.sock:/tmp/docker.sock:ro
+
+    letsencrypt-nginx-proxy-companion:
+        image: jrcs/letsencrypt-nginx-proxy-companion
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        volumes_from:
+            - nginx-proxy
+volumes:
+    static_files:
